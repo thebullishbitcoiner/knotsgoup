@@ -49,32 +49,53 @@ function App() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get<ApiResponse>('https://bitnodes.io/api/v1/snapshots/latest/');
-        setNodeData(response.data);
-        setTotalNodes(response.data.total_nodes);
-        
-        // Process version counts
-        const counts: { [key: string]: number } = {};
-        let knots = 0;
-        let others = 0;
+        // Check cache first
+        const cachedData = localStorage.getItem('nodeData');
+        const cachedTimestamp = localStorage.getItem('nodeDataTimestamp');
+        const currentTime = Date.now();
+        const CACHE_DURATION = 21 * 60 * 1000; // 5 minutes in milliseconds
 
-        Object.values(response.data.nodes).forEach((node) => {
-          const version = node[1];
-          counts[version] = (counts[version] || 0) + 1;
-          
-          if (version.includes('Knots')) {
-            knots++;
-          } else {
-            others++;
-          }
-        });
+        if (cachedData && cachedTimestamp && (currentTime - parseInt(cachedTimestamp)) < CACHE_DURATION) {
+          // Use cached data if it's less than 5 minutes old
+          const parsedData = JSON.parse(cachedData);
+          setNodeData(parsedData);
+          setTotalNodes(parsedData.total_nodes);
+          processNodeData(parsedData);
+        } else {
+          // Fetch new data if cache is expired or doesn't exist
+          const response = await axios.get<ApiResponse>('https://bitnodes.io/api/v1/snapshots/latest/');
+          setNodeData(response.data);
+          setTotalNodes(response.data.total_nodes);
+          processNodeData(response.data);
 
-        setVersionCounts(counts);
-        setKnotsCount(knots);
-        setOtherCount(others);
+          // Update cache
+          localStorage.setItem('nodeData', JSON.stringify(response.data));
+          localStorage.setItem('nodeDataTimestamp', currentTime.toString());
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
       }
+    };
+
+    const processNodeData = (data: ApiResponse) => {
+      const counts: { [key: string]: number } = {};
+      let knots = 0;
+      let others = 0;
+
+      Object.values(data.nodes).forEach((node) => {
+        const version = node[1];
+        counts[version] = (counts[version] || 0) + 1;
+        
+        if (version.includes('Knots')) {
+          knots++;
+        } else {
+          others++;
+        }
+      });
+
+      setVersionCounts(counts);
+      setKnotsCount(knots);
+      setOtherCount(others);
     };
 
     fetchData();
@@ -89,8 +110,8 @@ function App() {
     datasets: [
       {
         data: [knotsCount, otherCount],
-        backgroundColor: ['#ff9900', '#4a4a4a'],
-        borderColor: ['#cc7a00', '#2a2a2a'],
+        backgroundColor: ['#00702B', '#4a4a4a'],
+        borderColor: ['#005a23', '#2a2a2a'],
         borderWidth: 1,
       },
     ],
@@ -102,7 +123,7 @@ function App() {
         display: true,
         position: 'bottom' as const,
         labels: {
-          color: '#ff9900',
+          color: 'white',
           font: {
             size: 14,
             weight: 'bold' as const
@@ -133,9 +154,12 @@ function App() {
     },
     layout: {
       padding: {
-        bottom: 40
+        bottom: 20
       }
-    }
+    },
+    responsive: true,
+    maintainAspectRatio: true,
+    aspectRatio: 1
   };
 
   return (
@@ -144,7 +168,7 @@ function App() {
         <div className="relative">
           <div className="w-full mx-auto">
             <div className="pt-8 sm:pt-0 pb-2 text-base leading-6 space-y-4 text-gray-300 sm:text-lg sm:leading-7">
-              <h1 className="text-3xl font-bold text-center mb-8 text-[#ff9900]">Knots Go Up</h1>
+              <h1 className="text-3xl font-bold text-center mb-8 text-[#00702B]">Knots Go Up</h1>
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-12">
                 <div>
@@ -161,9 +185,9 @@ function App() {
                         <tbody className="divide-y divide-gray-700">
                           {sortedVersions.map(([version, count]) => (
                             <tr key={version} className="hover:bg-gray-900">
-                              <td className={`w-1/2 px-4 py-1.5 text-sm font-medium ${version.includes('Knots') ? 'text-[#ff9900]' : 'text-gray-300'} truncate`}>{version}</td>
-                              <td className={`w-1/4 px-4 py-1.5 text-sm ${version.includes('Knots') ? 'text-[#ff9900]' : 'text-gray-300'} text-right`}>{count.toLocaleString()}</td>
-                              <td className={`w-1/4 px-4 py-1.5 text-sm ${version.includes('Knots') ? 'text-[#ff9900]' : 'text-gray-300'} text-right`}>
+                              <td className={`w-1/2 px-4 py-1.5 text-sm font-medium ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} truncate`}>{version}</td>
+                              <td className={`w-1/4 px-4 py-1.5 text-sm ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} text-right`}>{count.toLocaleString()}</td>
+                              <td className={`w-1/4 px-4 py-1.5 text-sm ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} text-right`}>
                                 {((count / totalNodes) * 100).toFixed(2)}%
                               </td>
                             </tr>
@@ -175,15 +199,11 @@ function App() {
                 </div>
 
                 <div className="flex justify-center items-center">
-                  <div className="w-full lg:w-[800px] p-8">
+                  <div className="w-full lg:w-[800px] p-2 sm:p-8">
                     <Pie 
                       data={pieChartData}
-                      options={{
-                        ...pieChartOptions,
-                        maintainAspectRatio: false,
-                        responsive: true
-                      }}
-                      style={{ height: '700px' }}
+                      options={pieChartOptions}
+                      className="pie-chart-container"
                     />
                   </div>
                 </div>

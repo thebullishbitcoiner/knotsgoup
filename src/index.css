@@ -1,3 +1,13 @@
 @tailwind base;
 @tailwind components;
-@tailwind utilities; 
+@tailwind utilities;
+
+.pie-chart-container {
+  height: 420px;
+}
+
+@media (min-width: 1024px) {
+  .pie-chart-container {
+    height: 700px;
+  }
+} 
