@@ -182,7 +182,7 @@ function App() {
                 <img 
                   src="/media/knots-glitch.gif" 
                   alt="Loading..." 
-                  className="w-32 h-32 object-contain"
+                  className="w-16 h-16 sm:w-24 sm:h-24 object-contain"
                 />
               </div>
             ) : (
