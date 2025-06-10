@@ -1,0 +1,23 @@
+{
+  "short_name": "KnotsGoUp",
+  "name": "Knots Go Up - Bitcoin Knots Stats",
+  "icons": [
+    {
+      "src": "media/knots-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "media/knots-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#000000",
+  "orientation": "portrait"
+} 

@@ -45,10 +45,12 @@ function App() {
   const [knotsCount, setKnotsCount] = useState(0);
   const [otherCount, setOtherCount] = useState(0);
   const [totalNodes, setTotalNodes] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setIsLoading(true);
         // Check cache first
         const cachedData = localStorage.getItem('nodeData');
         const cachedTimestamp = localStorage.getItem('nodeDataTimestamp');
@@ -58,6 +60,8 @@ function App() {
         if (cachedData && cachedTimestamp && (currentTime - parseInt(cachedTimestamp)) < CACHE_DURATION) {
           // Use cached data if it's less than 5 minutes old
           const parsedData = JSON.parse(cachedData);
+          // Add a small delay when using cached data
+          await new Promise(resolve => setTimeout(resolve, 3000));
           setNodeData(parsedData);
           setTotalNodes(parsedData.total_nodes);
           processNodeData(parsedData);
@@ -74,6 +78,8 @@ function App() {
         }
       } catch (error) {
         console.error('Error fetching data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -171,48 +177,57 @@ function App() {
       <div className="relative w-full max-w-[1400px] mx-auto px-4">
         <div className="relative">
           <div className="w-full mx-auto">
-            <div className="pt-8 sm:pt-0 pb-2 text-base leading-6 space-y-4 text-gray-300 sm:text-lg sm:leading-7">
-              <h1 className="text-3xl font-bold text-center mb-8 text-[#00702B]">Knots Go Up</h1>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-12">
-                <div>
-                  <div className="overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full divide-y divide-gray-700">
-                        <thead>
-                          <tr>
-                            <th scope="col" className="w-[40%] px-2 sm:px-4 py-1.5 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Version</th>
-                            <th scope="col" className="w-[30%] px-2 sm:px-4 py-1.5 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Count</th>
-                            <th scope="col" className="w-[30%] px-2 sm:px-4 py-1.5 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">% of Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sortedVersions.map(([version, count]) => (
-                            <tr key={version} className="hover:bg-gray-900">
-                              <td className={`w-[40%] px-2 sm:px-4 py-1.5 text-sm font-medium ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} truncate`}>{version}</td>
-                              <td className={`w-[30%] px-2 sm:px-4 py-1.5 text-sm ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} text-right`}>{count.toLocaleString()}</td>
-                              <td className={`w-[30%] px-2 sm:px-4 py-1.5 text-sm ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} text-right`}>
-                                {((count / totalNodes) * 100).toFixed(2)}%
-                              </td>
+            {isLoading ? (
+              <div className="flex justify-center items-center min-h-screen">
+                <img 
+                  src="/media/knots-glitch.gif" 
+                  alt="Loading..." 
+                  className="w-32 h-32 object-contain"
+                />
+              </div>
+            ) : (
+              <div className="pt-8 sm:pt-0 pb-2 text-base leading-6 space-y-4 text-gray-300 sm:text-lg sm:leading-7">
+                <h1 className="text-3xl font-bold text-center mb-8 text-[#00702B]">Knots Go Up</h1>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-12">
+                  <div>
+                    <div className="overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full divide-y divide-gray-700">
+                          <thead>
+                            <tr>
+                              <th scope="col" className="w-[40%] px-2 sm:px-4 py-1.5 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Version</th>
+                              <th scope="col" className="w-[30%] px-2 sm:px-4 py-1.5 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Count</th>
+                              <th scope="col" className="w-[30%] px-2 sm:px-4 py-1.5 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">% of Total</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {sortedVersions.map(([version, count]) => (
+                              <tr key={version} className="hover:bg-gray-900">
+                                <td className={`w-[40%] px-2 sm:px-4 py-1.5 text-sm font-medium ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} truncate`}>{version}</td>
+                                <td className={`w-[30%] px-2 sm:px-4 py-1.5 text-sm ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} text-right`}>{count.toLocaleString()}</td>
+                                <td className={`w-[30%] px-2 sm:px-4 py-1.5 text-sm ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} text-right`}>
+                                  {((count / totalNodes) * 100).toFixed(2)}%
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center items-center">
+                    <div className="w-full lg:w-[800px] p-2 sm:p-8">
+                      <Pie 
+                        data={pieChartData}
+                        options={pieChartOptions}
+                        className="pie-chart-container"
+                      />
                     </div>
                   </div>
                 </div>
-
-                <div className="flex justify-center items-center">
-                  <div className="w-full lg:w-[800px] p-2 sm:p-8">
-                    <Pie 
-                      data={pieChartData}
-                      options={pieChartOptions}
-                      className="pie-chart-container"
-                    />
-                  </div>
-                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
