@@ -103,7 +103,11 @@ function App() {
 
   const sortedVersions = Object.entries(versionCounts)
     .sort(([, a], [, b]) => b - a)
-    .slice(0, 21);
+    .slice(0, 21)
+    .map(([version, count]): [string, number] => [
+      version.replace('/Satoshi:', '').replace(/\/$/, ''),
+      count
+    ]);
 
   const pieChartData = {
     labels: ['Knots', 'Core'],
@@ -177,17 +181,17 @@ function App() {
                       <table className="w-full divide-y divide-gray-700">
                         <thead>
                           <tr>
-                            <th scope="col" className="w-1/2 px-4 py-1.5 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Version</th>
-                            <th scope="col" className="w-1/4 px-4 py-1.5 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Count</th>
-                            <th scope="col" className="w-1/4 px-4 py-1.5 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">% of Total</th>
+                            <th scope="col" className="w-[40%] px-2 sm:px-4 py-1.5 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Version</th>
+                            <th scope="col" className="w-[30%] px-2 sm:px-4 py-1.5 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Count</th>
+                            <th scope="col" className="w-[30%] px-2 sm:px-4 py-1.5 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">% of Total</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-700">
+                        <tbody>
                           {sortedVersions.map(([version, count]) => (
                             <tr key={version} className="hover:bg-gray-900">
-                              <td className={`w-1/2 px-4 py-1.5 text-sm font-medium ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} truncate`}>{version}</td>
-                              <td className={`w-1/4 px-4 py-1.5 text-sm ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} text-right`}>{count.toLocaleString()}</td>
-                              <td className={`w-1/4 px-4 py-1.5 text-sm ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} text-right`}>
+                              <td className={`w-[40%] px-2 sm:px-4 py-1.5 text-sm font-medium ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} truncate`}>{version}</td>
+                              <td className={`w-[30%] px-2 sm:px-4 py-1.5 text-sm ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} text-right`}>{count.toLocaleString()}</td>
+                              <td className={`w-[30%] px-2 sm:px-4 py-1.5 text-sm ${version.includes('Knots') ? 'text-[#00702B]' : 'text-gray-300'} text-right`}>
                                 {((count / totalNodes) * 100).toFixed(2)}%
                               </td>
                             </tr>
