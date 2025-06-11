@@ -116,7 +116,7 @@ function App() {
     ]);
 
   const pieChartData = {
-    labels: ['Knots', 'Core'],
+    labels: ['Knots', 'Others'],
     datasets: [
       {
         data: [knotsCount, otherCount],
