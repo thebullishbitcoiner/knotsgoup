@@ -3,13 +3,13 @@
   "name": "Knots Go Up - Bitcoin Knots Stats",
   "icons": [
     {
-      "src": "media/knots-logo.png",
+      "src": "media/knotsgoup.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "media/knots-logo.png",
+      "src": "media/knotsgoup.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

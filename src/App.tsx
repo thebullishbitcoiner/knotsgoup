@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Pie } from 'react-chartjs-2';
+import { Pie, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -9,10 +9,12 @@ import {
   CategoryScale,
   LinearScale,
   Plugin,
+  PointElement,
+  LineElement,
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 
-ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, ChartDataLabels);
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, ChartDataLabels, PointElement, LineElement);
 
 interface NodeData {
   [key: string]: [
@@ -39,6 +41,20 @@ interface ApiResponse {
   nodes: NodeData;
 }
 
+interface Snapshot {
+  url: string;
+  timestamp: number;
+  total_nodes: number;
+  latest_height: number;
+}
+
+interface SnapshotResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Snapshot[];
+}
+
 function App() {
   const [nodeData, setNodeData] = useState<ApiResponse | null>(null);
   const [versionCounts, setVersionCounts] = useState<{ [key: string]: number }>({});
@@ -46,6 +62,8 @@ function App() {
   const [otherCount, setOtherCount] = useState(0);
   const [totalNodes, setTotalNodes] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [historicalData, setHistoricalData] = useState<{ timestamp: number; knotsCount: number }[]>([]);
+  const [isLoadingHistorical, setIsLoadingHistorical] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -83,6 +101,105 @@ function App() {
       }
     };
 
+    const fetchHistoricalData = async () => {
+      try {
+        setIsLoadingHistorical(true);
+        
+        // Check cache first
+        const cachedData = localStorage.getItem('knotsgoup_snapshots');
+        const cachedTimestamp = localStorage.getItem('knotsgoup_snapshots_timestamp');
+        const currentTime = Date.now();
+        const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+        if (cachedData && cachedTimestamp && (currentTime - parseInt(cachedTimestamp)) < CACHE_DURATION) {
+          console.log('Using cached historical data');
+          const parsedData = JSON.parse(cachedData);
+          setHistoricalData(parsedData);
+          setIsLoadingHistorical(false);
+          return;
+        }
+
+        console.log('Fetching new historical data...');
+        const historicalData: { timestamp: number; knotsCount: number }[] = [];
+        let nextUrl: string | null = 'https://bitnodes.io/api/v1/snapshots/';
+        const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+        let lastTimestamp: number | null = null;
+        let apiCallCount = 0;
+        const MAX_API_CALLS = 12; // Maximum number of API calls (60 days / 7 days ≈ 8-9 calls, rounded up to 12 for safety)
+
+        while (nextUrl && apiCallCount < MAX_API_CALLS) {
+          apiCallCount++;
+          console.log(`API Call ${apiCallCount}: Fetching ${nextUrl}`);
+          
+          const response: { data: SnapshotResponse } = await axios.get<SnapshotResponse>(nextUrl);
+          const snapshots = response.data.results;
+          console.log(`Received ${snapshots.length} snapshots in this page`);
+          
+          // Filter snapshots to be at least one week apart
+          const filteredSnapshots = snapshots.filter((snapshot: Snapshot) => {
+            if (!lastTimestamp) {
+              lastTimestamp = snapshot.timestamp;
+              return true;
+            }
+            
+            const timeDiff = Math.abs(snapshot.timestamp - lastTimestamp);
+            if (timeDiff >= ONE_WEEK_MS / 1000) { // Convert to seconds since timestamps are in seconds
+              lastTimestamp = snapshot.timestamp;
+              return true;
+            }
+            return false;
+          });
+          
+          console.log(`Filtered to ${filteredSnapshots.length} snapshots that are at least a week apart`);
+
+          // Process filtered snapshots
+          for (const snapshot of filteredSnapshots) {
+            console.log(`Fetching snapshot data from ${snapshot.url}`);
+            const snapshotResponse = await axios.get<ApiResponse>(snapshot.url);
+            let knotsCount = 0;
+            
+            Object.values(snapshotResponse.data.nodes).forEach((node) => {
+              const version = node[1];
+              if (version.includes('Knots')) {
+                knotsCount++;
+              }
+            });
+            
+            historicalData.push({
+              timestamp: snapshot.timestamp,
+              knotsCount
+            });
+            console.log(`Added data point: ${new Date(snapshot.timestamp * 1000).toLocaleDateString()} - ${knotsCount} Knots nodes`);
+          }
+
+          // Update nextUrl with the next page URL from the response
+          nextUrl = response.data.next;
+          console.log(`Next URL for pagination: ${nextUrl}`);
+          
+          // Add a small delay between API calls to avoid rate limiting
+          if (nextUrl) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        
+        console.log(`Finished fetching data. Total data points: ${historicalData.length}`);
+        
+        // Sort data by timestamp
+        const sortedData = historicalData.sort((a, b) => a.timestamp - b.timestamp);
+        
+        // Update cache
+        localStorage.setItem('knotsgoup_snapshots', JSON.stringify(sortedData));
+        localStorage.setItem('knotsgoup_snapshots_timestamp', currentTime.toString());
+        
+        // Update state
+        setHistoricalData(sortedData);
+      } catch (error) {
+        console.error('Error fetching historical data:', error);
+      } finally {
+        setIsLoadingHistorical(false);
+      }
+    };
+
     const processNodeData = (data: ApiResponse) => {
       const counts: { [key: string]: number } = {};
       let knots = 0;
@@ -105,6 +222,7 @@ function App() {
     };
 
     fetchData();
+    fetchHistoricalData();
   }, []);
 
   const sortedVersions = Object.entries(versionCounts)
@@ -172,6 +290,64 @@ function App() {
     aspectRatio: 1
   };
 
+  const lineChartData = {
+    labels: historicalData.map(data => new Date(data.timestamp * 1000).toLocaleDateString()),
+    datasets: [
+      {
+        label: 'Knots Nodes',
+        data: historicalData.map(data => data.knotsCount),
+        borderColor: '#00702B',
+        backgroundColor: 'rgba(0, 112, 43, 0.1)',
+        fill: true,
+        tension: 0.4,
+      },
+    ],
+  };
+
+  const lineChartOptions = {
+    responsive: true,
+    maintainAspectRatio: true,
+    aspectRatio: 2,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top' as const,
+        labels: {
+          color: 'white',
+          font: {
+            size: 14,
+            weight: 'bold' as const
+          }
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context: any) {
+            return `Knots Nodes: ${context.raw}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)'
+        },
+        ticks: {
+          color: 'white'
+        }
+      },
+      y: {
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)'
+        },
+        ticks: {
+          color: 'white'
+        }
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black flex flex-col justify-center">
       <div className="relative w-full max-w-[1400px] mx-auto px-4">
@@ -224,6 +400,26 @@ function App() {
                         className="pie-chart-container"
                       />
                     </div>
+                  </div>
+                </div>
+                
+                <div className="mt-8">
+                  <h2 className="text-2xl font-bold text-center mb-4 text-[#00702B]">Historical Knots Node Count</h2>
+                  <div className="w-full max-w-[1200px] mx-auto p-4">
+                    {isLoadingHistorical ? (
+                      <div className="flex justify-center items-center h-64">
+                        <img 
+                          src="/media/knots-glitch.gif" 
+                          alt="Loading..." 
+                          className="w-16 h-16 sm:w-24 sm:h-24 object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <Line 
+                        data={lineChartData}
+                        options={lineChartOptions}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
